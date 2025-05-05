@@ -19,6 +19,11 @@ fm.fontManager.addfont('TaipeiSansTCBeta-Regular.ttf')
 plt.rcParams["font.size"] = 14
 plt.rcParams['font.family'] = 'Taipei Sans TC Beta'
 
+st.set_page_config(
+    page_title="功能打樣版 僅供3人同時使用",
+    page_icon="random",
+)
+
 
 def model_1():
     st.write("可自行上傳逐秒車速[km/h]、車重[噸]之.csv資料(註: 車重=空車重+載重)。")
@@ -27,11 +32,14 @@ def model_1():
     st.header("")
     if uploaded_file:
         df=pd.read_csv(uploaded_file)
-        st.write("filename:", uploaded_file.name)
+        st.write("檔案名稱：", uploaded_file.name)
+        st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
     else:
         df=pd.read_csv('model_1_5km_test_data.csv')
-        df.columns=['VehicleSpeed[km/h]', 'VehicleWeight[ton]']
-        st.write("預設測試行駛資料：")   
+        st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")   
+
+    df.columns=['VehicleSpeed[km/h]', 'VehicleWeight[ton]']
+    st.dataframe(df)
 
     pp_FULL = np.load("model_1_5km_FULL_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.9
     pp_HALF = np.load("model_1_5km_HALF_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.55
@@ -45,8 +53,8 @@ def model_1():
                                       (VW_FULL_LOAD-VW_HALF_LOAD) *
                                       (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)    
     
-    st.write(f"{df['predict_FuelRate[L/h]'].sum()/3600:.2f}公升")
-    st.write(f"行駛{df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f}公里")
+    st.write(f"使用燃油{df['predict_FuelRate[L/h]'].sum()/3600:.2f}公升")
+    st.write(f"累計行駛{df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f}公里")
     st.write(f"預測能效{(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f}公里/公升")
 
 
@@ -64,11 +72,11 @@ st.sidebar.subheader("以26噸大貨車實測數據推估：")
 option=st.sidebar.selectbox("功能模式：",
                             options=['1) 能效=f(車速)',
                                      '5) 能效=f(車速, 引擎轉速)',
-                                     '6) 依車輛動力學，逆向動力傳遞之BSFC=f(引擎轉速, 引擎扭矩)'])
+                                     '6) 依車輛動力學(逆向動力傳遞)之BSFC=f(引擎轉速, 引擎扭矩)'])
 st.sidebar.write("目前選用的功能模式為：", option)
 operation={'1) 能效=f(車速)': model_1,
            '5) 能效=f(車速, 引擎轉速)': model_5,
-           '6) 依車輛動力學，逆向動力傳遞之BSFC=f(引擎轉速, 引擎扭矩)': model_6}
+           '6) 依車輛動力學(逆向動力傳遞)之BSFC=f(引擎轉速, 引擎扭矩)': model_6}
 
 
 
