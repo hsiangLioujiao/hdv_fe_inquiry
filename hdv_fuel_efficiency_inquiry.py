@@ -12,6 +12,7 @@ from matplotlib import font_manager as fm
 import seaborn as sns
 import random
 import streamlit as st
+import pickle
 
 
 pd.options.mode.copy_on_write = True
@@ -26,23 +27,23 @@ st.set_page_config(
 
 
 def model_1():
-    st.write("可自行上傳逐秒車速[km/h]、車重[噸]之.csv資料(註: 車重=空車重+載重)。")
+    st.write("可自行上傳逐秒車速[公里/小時]、車重[噸]之.csv資料(註: 車重=空車重+載重)。")
     st.write("所上傳資料需均為數字，不含上述的欄位名稱。")  
     uploaded_file=st.file_uploader("選一檔案",type=".csv")    
     st.header("")
     if uploaded_file:
         df=pd.read_csv(uploaded_file)
-        st.write("檔案名稱：", uploaded_file.name)
+        st.write("上傳的檔案名稱：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
     else:
-        df=pd.read_csv('model_1_5km_test_data.csv')
+        df=pd.read_csv('model_1_spacing_5km_default_data.csv')
         st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")   
 
     df.columns=['VehicleSpeed[km/h]', 'VehicleWeight[ton]']
     st.dataframe(df)
 
-    pp_FULL = np.load("model_1_5km_FULL_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.9
-    pp_HALF = np.load("model_1_5km_HALF_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.55
+    pp_FULL = np.load("model_1_spacing_5km_FULL_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.9
+    pp_HALF = np.load("model_1_spacing_5km_HALF_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.55
     
     df['time[s]'] = [i for i in range(1, len(df)+1)]
     VW_FULL_LOAD = (14.975+(26-14.975)*0.9)
@@ -53,13 +54,50 @@ def model_1():
                                       (VW_FULL_LOAD-VW_HALF_LOAD) *
                                       (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)    
     
-    st.write(f"使用燃油{df['predict_FuelRate[L/h]'].sum()/3600:.2f}公升")
-    st.write(f"累計行駛{df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f}公里")
-    st.write(f"預測能效{(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f}公里/公升")
+    st.subheader(f"使用燃油{df['predict_FuelRate[L/h]'].sum()/3600:.2f}公升")
+    st.subheader(f"累計行駛{df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f}公里")
+    st.subheader(f"預測能效{(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f}公里/公升")
 
 
 def model_5():
-    pass
+    st.write("可自行上傳逐秒車速[公里/小時]、引擎轉速[rpm]、車重[噸]之.csv資料(註: 車重=空車重+載重)。")
+    st.write("所上傳資料需均為數字，不含上述的欄位名稱。")  
+    uploaded_file=st.file_uploader("選一檔案",type=".csv")    
+    st.header("")
+    if uploaded_file:
+        df=pd.read_csv(uploaded_file)
+        st.write("上傳的檔案名稱：", uploaded_file.name)
+        st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
+    else:
+        df=pd.read_csv('model_5_spacing_6x6_default_data.csv')
+        st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")  
+
+    df.columns=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
+    st.dataframe(df)
+
+    # 14.975+(26-14.975)*0.9
+    with open('model_5_spacing_6x6_FULL_LOAD.pkl', 'rb') as f:
+        reg_FULL_LOAD = pickle.load(f)
+    # 14.975+(26-14.975)*0.55
+    with open('model_5_spacing_6x6_HALF_LOAD.pkl', 'rb') as f:
+        reg_HALF_LOAD = pickle.load(f)
+
+    df['VW_FULL_LOAD[ton]'] = 14.975+(26-14.975)*0.9
+    df['VW_HALF_LOAD[ton]'] = 14.975+(26-14.975)*0.55
+    df['predict_FULL_LOAD_FuelRate[L/h]'] = reg_FULL_LOAD.predict(df[['VehicleSpeed[km/h]', 'EngineSpeed[rpm]']])
+    df.loc[df['predict_FULL_LOAD_FuelRate[L/h]']<0, 'predict_FULL_LOAD_FuelRate[L/h]'] = 0.
+    df['predict_HALF_LOAD_FuelRate[L/h]'] = reg_HALF_LOAD.predict(df[['VehicleSpeed[km/h]', 'EngineSpeed[rpm]']])
+    df.loc[df['predict_HALF_LOAD_FuelRate[L/h]']<0, 'predict_HALF_LOAD_FuelRate[L/h]'] = 0.
+
+    df['predict_FuelRate[L/h]'] = df.apply(lambda x: x['predict_HALF_LOAD_FuelRate[L/h]'] +
+                                           (x['predict_FULL_LOAD_FuelRate[L/h]']-x['predict_HALF_LOAD_FuelRate[L/h]']) /
+                                           (x['VW_FULL_LOAD[ton]']-x['VW_HALF_LOAD[ton]']) *
+                                           (x['VehicleWeight[ton]']-x['VW_HALF_LOAD[ton]']), axis=1)
+
+    st.subheader(f"使用燃油{df['predict_FuelRate[L/h]'].sum()/3600:.2f}公升")
+    st.subheader(f"累計行駛{df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f}公里")
+    st.subheader(f"預測能效{(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f}公里/公升")
+
 
 def model_6():
     pass
