@@ -7,10 +7,6 @@ Created on Mon May  5 15:06:51 2025
 
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from matplotlib import font_manager as fm
-import seaborn as sns
-import random
 import streamlit as st
 import pickle
 
