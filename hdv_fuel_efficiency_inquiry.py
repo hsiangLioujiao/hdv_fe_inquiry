@@ -7,31 +7,38 @@ Created on Mon May  5 15:06:51 2025
 
 import numpy as np
 import pandas as pd
+# import matplotlib.pyplot as plt
+# from matplotlib import font_manager as fm
+# import seaborn as sns
+# import random
 import streamlit as st
 import pickle
 
 
-pd.options.mode.copy_on_write = True
+# pd.options.mode.copy_on_write = True
+# fm.fontManager.addfont('TaipeiSansTCBeta-Regular.ttf')
+# plt.rcParams["font.size"] = 14
+# plt.rcParams['font.family'] = 'Taipei Sans TC Beta'
+
 st.set_page_config(
     page_title="功能打樣版 僅供3人同時使用",
     page_icon="random",
 )
 
 
-def model_1():
-    st.write("可自行上傳逐秒車速[公里/小時]、車重[噸]之.csv資料(註: 車重=空車重+載重)。")
-    st.write("所上傳資料需均為數字，不含上述的欄位名稱。")  
-    uploaded_file=st.file_uploader("選一檔案",type=".csv")    
-    st.header("")
+def model_1(): # 能效=f(車速)
+    st.write("可自行上傳逐秒之車速、車重資料(.csv)，需以「,」區隔欄位(columns)。")
+    st.write("檔案的第一列(row)需為「VehicleSpeed[km/h], VehicleWeight[ton]」(註: 車重=空車重+載重), 其餘為數字資料。")  
+    uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
+    st.write("")
     if uploaded_file:
-        df=pd.read_csv(uploaded_file)
-        st.write("上傳的檔案名稱：", uploaded_file.name)
+        df=pd.read_csv(uploaded_file, usecols=['VehicleSpeed[km/h]', 'VehicleWeight[ton]'])
+        st.write("已上傳檔案：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
     else:
-        df=pd.read_csv('model_1_spacing_5km_default_data.csv')
+        df=pd.read_csv('default_data.csv')
         st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")   
 
-    df.columns=['VehicleSpeed[km/h]', 'VehicleWeight[ton]']
     st.dataframe(df)
 
     pp_FULL = np.load("model_1_spacing_5km_FULL_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.9
@@ -46,25 +53,24 @@ def model_1():
                                       (VW_FULL_LOAD-VW_HALF_LOAD) *
                                       (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)    
     
-    st.subheader(f"使用燃油{df['predict_FuelRate[L/h]'].sum()/3600:.2f}公升")
-    st.subheader(f"累計行駛{df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f}公里")
-    st.subheader(f"預測能效{(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f}公里/公升")
+    st.subheader(f"累計行駛 {df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f} 公里")
+    st.subheader(f"預測用油 {df['predict_FuelRate[L/h]'].sum()/3600:.2f} 公升")
+    st.subheader(f"預測能效 {(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f} 公里/公升")
 
 
 def model_5():
-    st.write("可自行上傳逐秒車速[公里/小時]、引擎轉速[rpm]、車重[噸]之.csv資料(註: 車重=空車重+載重)。")
-    st.write("所上傳資料需均為數字，不含上述的欄位名稱。")  
-    uploaded_file=st.file_uploader("選一檔案",type=".csv")    
-    st.header("")
+    st.write("可自行上傳逐秒之車速、引擎轉速、車重資料(.csv)，需以「,」區隔欄位(columns)。")
+    st.write("檔案的第一列(row)需為「VehicleSpeed[km/h], EngineSpeed[rpm], VehicleWeight[ton]」(註: 車重=空車重+載重), 其餘為數字資料。")
+    uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
+    st.write("")
     if uploaded_file:
-        df=pd.read_csv(uploaded_file)
-        st.write("上傳的檔案名稱：", uploaded_file.name)
+        df=pd.read_csv(uploaded_file, usecols=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]'])
+        st.write("已上傳檔案：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
     else:
-        df=pd.read_csv('model_5_spacing_6x6_default_data.csv')
+        df=pd.read_csv('default_data.csv')
         st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")  
 
-    df.columns=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
     st.dataframe(df)
 
     # 14.975+(26-14.975)*0.9
@@ -86,9 +92,9 @@ def model_5():
                                            (x['VW_FULL_LOAD[ton]']-x['VW_HALF_LOAD[ton]']) *
                                            (x['VehicleWeight[ton]']-x['VW_HALF_LOAD[ton]']), axis=1)
 
-    st.subheader(f"使用燃油{df['predict_FuelRate[L/h]'].sum()/3600:.2f}公升")
-    st.subheader(f"累計行駛{df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f}公里")
-    st.subheader(f"預測能效{(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f}公里/公升")
+    st.subheader(f"累計行駛 {df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f} 公里")
+    st.subheader(f"預測用油 {df['predict_FuelRate[L/h]'].sum()/3600:.2f} 公升")
+    st.subheader(f"預測能效 {(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f} 公里/公升")
 
 
 def model_6():
@@ -98,15 +104,16 @@ def model_6():
 
 #網頁的sidebar版面
 st.sidebar.header("大貨車行駛及沿途上下貨之操作能效模擬 - v0.11")
-st.sidebar.subheader("以26噸大貨車實測數據推估：")
+st.sidebar.markdown("**:green[以26噸大貨車道路實測數據推估]**")
 option=st.sidebar.selectbox("功能模式：",
-                            options=['1) 能效=f(車速)',
-                                     '5) 能效=f(車速, 引擎轉速)',
-                                     '6) 依車輛動力學(逆向動力傳遞)之BSFC=f(引擎轉速, 引擎扭矩)'])
-st.sidebar.write("目前選用的功能模式為：", option)
-operation={'1) 能效=f(車速)': model_1,
-           '5) 能效=f(車速, 引擎轉速)': model_5,
-           '6) 依車輛動力學(逆向動力傳遞)之BSFC=f(引擎轉速, 引擎扭矩)': model_6}
+                            options=['1. 能效=f(車速) 依迴歸分析',
+                                     '5. 能效=f(車速, 引擎轉速) 依迴歸分析',
+                                     '6. BSFC=f(引擎轉速, 引擎扭矩) 依車輛動力學(逆向動力傳遞)'])
+st.sidebar.subheader("")
+st.sidebar.write(f"目前選用模式 {option} 推估")
+operation={'1. 能效=f(車速) 依迴歸分析': model_1,
+           '5. 能效=f(車速, 引擎轉速) 依迴歸分析': model_5,
+           '6. BSFC=f(引擎轉速, 引擎扭矩) 依車輛動力學(逆向動力傳遞)': model_6}
 
 
 
