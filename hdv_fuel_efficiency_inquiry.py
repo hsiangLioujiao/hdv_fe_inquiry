@@ -1,108 +1,131 @@
-# -*- coding: utf-8 -*-
-"""
-Created on Mon May  5 15:06:51 2025
-
-@author: g_s_s
-"""
-
 import numpy as np
 import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib import font_manager as fm
-# import seaborn as sns
-# import random
+import seaborn as sns
 import streamlit as st
 import ast
 import pickle
+from sklearn.neural_network import MLPRegressor
+from sklearn.preprocessing import StandardScaler
+
+from src.columns_correctness import test_columns_correctness
 
 
 pd.options.mode.copy_on_write = True
 fm.fontManager.addfont('TaipeiSansTCBeta-Regular.ttf')
 plt.rcParams["font.size"] = 14
 plt.rcParams['font.family'] = 'Taipei Sans TC Beta'
-
-st.set_page_config(
-    page_title="功能打樣版 僅供3人同時使用",
-    page_icon="random",
-)
+st.set_page_config(page_title="功能打樣版 僅供3人同時使用", page_icon="random")
 
 
-def model_1(): # 能效=f(車速)
-    st.write("可自行上傳逐秒之車速、車重資料檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
-    st.write("檔案的第一列(row)需有「VehicleWeight[ton], VehicleSpeed[km/h]」兩欄位名稱, 其餘列為數字資料。")  
+
+
+def model_1():
+    st.write("可自行上傳具逐秒車速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
+    st.write("檔案首列(row)為VehicleSpeed[km/h]及VehicleWeight[ton]兩欄位名稱, 其餘列的內容為數字資料。")  
     st.write("")
     uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
     st.write("")
+    
+    cols=['VehicleSpeed[km/h]', 'VehicleWeight[ton]']
     if uploaded_file:
-        df=pd.read_csv(uploaded_file, usecols=['VehicleWeight[ton]', 'VehicleSpeed[km/h]'])
+        df=pd.read_csv(uploaded_file)
         st.write("已上傳檔案：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
+        data_correctness=test_columns_correctness(cols, df)
     else:
-        df=pd.read_csv('default_data.csv')
+        df=pd.read_csv('.//data//default_data.csv')
         st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")   
-
-    st.dataframe(df)
-
-    pp_FULL = np.load("model_1_spacing_5km_FULL_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.9
-    pp_HALF = np.load("model_1_spacing_5km_HALF_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.55
+        data_correctness=True
     
-    df['time[s]'] = [i for i in range(1, len(df)+1)]
-    VW_FULL_LOAD = (14.975+(26-14.975)*0.9)
-    VW_HALF_LOAD = (14.975+(26-14.975)*0.55)
+    if data_correctness:
+        df=df[cols]
+        st.dataframe(df)
+        
+        df['time[s]'] = [i for i in range(1, len(df)+1)]
+        
+        fig, ax1 = plt.subplots()
+        color_v = 'tab:blue'
+        ax1.set_xlabel('時間[s]')
+        ax1.set_ylabel('車速[km/h]', color=color_v)
+        ax1.plot(df['time[s]'], df['VehicleSpeed[km/h]'], color=color_v, linewidth=2, label='VehicleSpeed[km/h]')
+        ax1.tick_params(axis='y', labelcolor=color_v)
+        ax2 = ax1.twinx() 
+        color_w = 'tab:red'
+        ax2.set_ylabel('車重[噸]', color=color_w)
+        ax2.plot(df['time[s]'], df['VehicleWeight[ton]'], color=color_w, linewidth=2, linestyle='--', label='VehicleWeight[ton]')
+        ax2.tick_params(axis='y', labelcolor=color_w)
+        ax2.set_ylim(20, 26)
+        plt.title('大貨車行駛及沿途上下貨之操作')
+        fig.tight_layout()
+        st.pyplot(fig)
 
-    df['predict_FuelRate[L/h]'] = df.apply(lambda x: np.poly1d(pp_HALF)(x['VehicleSpeed[km/h]']) +
-                                      (np.poly1d(pp_FULL)(x['VehicleSpeed[km/h]'])-np.poly1d(pp_HALF)(x['VehicleSpeed[km/h]'])) /
-                                      (VW_FULL_LOAD-VW_HALF_LOAD) *
-                                      (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)    
-    
-    st.subheader(f"累計行駛 {df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f} 公里")
-    st.subheader(f"預測用油 {df['predict_FuelRate[L/h]'].sum()/3600:.2f} 公升")
-    st.subheader(f"預測能效 {(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f} 公里/公升")
+        pp_FULL = np.load(".//models//model_1_spacing_5km_FULL_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.9
+        pp_HALF = np.load(".//models//model_1_spacing_5km_HALF_LOAD.npy",allow_pickle=True) # 14.975+(26-14.975)*0.55
+        
+
+        VW_FULL_LOAD = (14.975+(26-14.975)*0.9)
+        VW_HALF_LOAD = (14.975+(26-14.975)*0.55)
+
+        df['predict_FuelRate[L/h]'] = df.apply(lambda x: np.poly1d(pp_HALF)(x['VehicleSpeed[km/h]']) +
+                                          (np.poly1d(pp_FULL)(x['VehicleSpeed[km/h]'])-np.poly1d(pp_HALF)(x['VehicleSpeed[km/h]'])) /
+                                          (VW_FULL_LOAD-VW_HALF_LOAD) *
+                                          (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)    
+        
+        st.subheader(f"累計行駛 {df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f} 公里")
+        st.subheader(f"預測用油 {df['predict_FuelRate[L/h]'].sum()/3600:.2f} 公升")
+        st.subheader(f"預測能效 {(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f} 公里/公升")
 
 
 def model_5():
-    st.write("可自行上傳逐秒之車速、引擎轉速、車重資料檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
-    st.write("檔案的第一列(row)需有「VehicleWeight[ton], VehicleSpeed[km/h], EngineSpeed[rpm]」三欄位名稱, 其餘列為數字資料。")
+    st.write("可自行上傳具逐秒車速、引擎轉速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
+    st.write("檔案首列(row)為VehicleSpeed[km/h]、EngineSpeed[rpm]及VehicleWeight[ton]三欄位名稱, 其餘列的內容為數字資料。")
     st.write("")
     uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
     st.write("")
+    
+    cols=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
     if uploaded_file:
-        df=pd.read_csv(uploaded_file, usecols=['VehicleWeight[ton]', 'VehicleSpeed[km/h]', 'EngineSpeed[rpm]'])
+        df=pd.read_csv(uploaded_file)
         st.write("已上傳檔案：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
+        data_correctness=test_columns_correctness(cols, df)          
     else:
-        df=pd.read_csv('default_data.csv')
-        st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")  
+        df=pd.read_csv('.//data//default_data.csv')
+        st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")
+        data_correctness=True
+    
+    if data_correctness:
+        df=df[cols]
+        st.dataframe(df)        
 
-    st.dataframe(df)
+        VW_FULL_LOAD = 14.975+(26-14.975)*0.9 # [ton]
+        VW_HALF_LOAD = 14.975+(26-14.975)*0.55 # [ton]        
 
-    # 14.975+(26-14.975)*0.9
-    with open('model_5_spacing_6x6_FULL_LOAD.pkl', 'rb') as f:
-        reg_FULL_LOAD = pickle.load(f)
-    # 14.975+(26-14.975)*0.55
-    with open('model_5_spacing_6x6_HALF_LOAD.pkl', 'rb') as f:
-        reg_HALF_LOAD = pickle.load(f)
+        with open('.//models//model_5_spacing_6x6_FULL_LOAD.pkl', 'rb') as f:
+            reg_FULL_LOAD = pickle.load(f)
+        with open('.//models//model_5_spacing_6x6_HALF_LOAD.pkl', 'rb') as f:
+            reg_HALF_LOAD = pickle.load(f)
 
-    VW_FULL_LOAD = 14.975+(26-14.975)*0.9 # [ton]
-    VW_HALF_LOAD = 14.975+(26-14.975)*0.55 # [ton]
-    df['predict_FULL_LOAD_FuelRate[L/h]'] = reg_FULL_LOAD.predict(df[['VehicleSpeed[km/h]', 'EngineSpeed[rpm]']])
-    df.loc[df['predict_FULL_LOAD_FuelRate[L/h]']<0, 'predict_FULL_LOAD_FuelRate[L/h]'] = 0.
-    df['predict_HALF_LOAD_FuelRate[L/h]'] = reg_HALF_LOAD.predict(df[['VehicleSpeed[km/h]', 'EngineSpeed[rpm]']])
-    df.loc[df['predict_HALF_LOAD_FuelRate[L/h]']<0, 'predict_HALF_LOAD_FuelRate[L/h]'] = 0.
+        df['predict_FULL_LOAD_FuelRate[L/h]'] = reg_FULL_LOAD.predict(df[['VehicleSpeed[km/h]', 'EngineSpeed[rpm]']])
+        df.loc[df['predict_FULL_LOAD_FuelRate[L/h]']<0, 'predict_FULL_LOAD_FuelRate[L/h]'] = 0.
+        df['predict_HALF_LOAD_FuelRate[L/h]'] = reg_HALF_LOAD.predict(df[['VehicleSpeed[km/h]', 'EngineSpeed[rpm]']])
+        df.loc[df['predict_HALF_LOAD_FuelRate[L/h]']<0, 'predict_HALF_LOAD_FuelRate[L/h]'] = 0.
 
-    df['predict_FuelRate[L/h]'] = df.apply(lambda x: x['predict_HALF_LOAD_FuelRate[L/h]'] +
-                                           (x['predict_FULL_LOAD_FuelRate[L/h]']-x['predict_HALF_LOAD_FuelRate[L/h]']) /
-                                           (VW_FULL_LOAD-VW_HALF_LOAD) *
-                                           (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)
+        df['predict_FuelRate[L/h]'] = df.apply(lambda x: x['predict_HALF_LOAD_FuelRate[L/h]'] +
+                                               (x['predict_FULL_LOAD_FuelRate[L/h]']-x['predict_HALF_LOAD_FuelRate[L/h]']) /
+                                               (VW_FULL_LOAD-VW_HALF_LOAD) *
+                                               (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)
 
-    st.subheader(f"累計行駛 {df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f} 公里")
-    st.subheader(f"預測用油 {df['predict_FuelRate[L/h]'].sum()/3600:.2f} 公升")
-    st.subheader(f"預測能效 {(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f} 公里/公升")
+        st.subheader(f"累計行駛 {df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f} 公里")
+        st.subheader(f"預測用油 {df['predict_FuelRate[L/h]'].sum()/3600:.2f} 公升")
+        st.subheader(f"預測能效 {(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f} 公里/公升")
 
 
 def model_6():
-    st.markdown("**:green[此處使用日本重車能效法規的車輛空氣阻力係數、輪胎滾動阻力係數等經驗式]**")
+    st.markdown("**:green[此推估使用日本重車能效法規的車輛空氣阻力係數、輪胎滾動阻力係數、傳動效率...等經驗式及經驗數值。下列規格數據為實測26噸大貨車資料，可視實際情況調整。]**")
     st.write("")
     
     density_deisel = 836. # 柴油密度[kg/m3] @ VECTO
@@ -129,132 +152,197 @@ def model_6():
     r = wheel_D / 2.
 
     st.subheader("")    
-    st.write("可自行上傳逐秒之車速、引擎轉速、道路坡度、車重資料檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
-    st.write("檔案的第一列(row)需有「VehicleWeight[ton], VehicleSpeed[km/h], EngineSpeed[rpm], grad[%]」四欄位名稱, 其餘列為數字資料。")
+    st.write("可自行上傳具逐秒車速、引擎轉速、道路坡度、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
+    st.write("檔案首列(row)為VehicleSpeed[km/h], EngineSpeed[rpm], grad[%], VehicleWeight[ton]四欄位名稱, 其餘列的內容為數字資料。")
     st.write("")
     uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
     st.write("")
+    
+    cols=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'grad[%]', 'VehicleWeight[ton]']
     if uploaded_file:
-        df=pd.read_csv(uploaded_file, usecols=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'grad[%]', 'VehicleWeight[ton]'])
+        df=pd.read_csv(uploaded_file)
         st.write("已上傳檔案：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
-        df['time[s]'] = [i for i in range(1, len(df)+1)]
-        df = df[['time[s]', 'VehicleWeight[ton]', 'VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'grad[%]']]
+        data_correctness=test_columns_correctness(cols, df)
     else:
-        df=pd.read_csv('default_data.csv')
-        st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")  
+        df=pd.read_csv('.//data//default_data.csv')
+        st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")
+        data_correctness=True        
 
-    st.dataframe(df)    
+    if data_correctness:
+        df=df[cols]
+        st.dataframe(df)
+        
+        df['time[s]'] = [i for i in range(1, len(df)+1)]
+        df = df[['time[s]', 'VehicleWeight[ton]', 'VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'grad[%]']]    
 
-    # 14.975+(26-14.975)*0.9
-    with open('model_6_spacing_12x12_FULL_LOAD.pkl', 'rb') as f:
-        reg_FULL_LOAD = pickle.load(f)
-    # 14.975+(26-14.975)*0.55
-    with open('model_6_spacing_12x12_HALF_LOAD.pkl', 'rb') as f:
-        reg_HALF_LOAD = pickle.load(f)
-    
-    df['acc[m/s^2]'] = (df.loc[0, 'VehicleSpeed[km/h]'] - 0.) / 3.6 # 資料為逐秒紀錄
-    for i in range(1, len(df)):
-        df.loc[i, 'acc[m/s^2]'] = (df.loc[i, 'VehicleSpeed[km/h]'] - df.loc[i-1, 'VehicleSpeed[km/h]']) / 3.6
-    
-    # 檔位判斷，忽略空檔、換檔間的操作情況
-    def v_to_n(v, g):
-        """ 從車速[km/h]、檔位g，計算引擎轉速[rpm] """
-        if gear_ratio := i_m_1_n.get(g):
-            return (v*1000./60.) / (wheel_D*np.pi) * i_f * gear_ratio
-        else:
-            print("Gear Position Error!")
-    
-    def predit_gear_position(v, n):
-        """ 從車速[km/h]，計算1~16檔的可能引擎轉速，並取出最接近引擎轉速的檔位 """
-        l=[]
-        for g in range(1, i_m_m+1):
-            l.append(abs(v_to_n(v,g)-n))
-        return l.index(min(l))+1
-    
-    df['predit_gear_position'] = df.apply(lambda x: predit_gear_position(x['VehicleSpeed[km/h]'], x['EngineSpeed[rpm]']), axis=1)
-    df['i_m'] = df['predit_gear_position'].apply(lambda x :i_m_1_n.get(x))
-    
-    
-    fig, ax = plt.subplots(figsize=(16, 8))
-    norm = matplotlib.colors.Normalize(vmin=1, vmax=i_m_m)
-    sc = ax.scatter(df['time[s]'], df['VehicleSpeed[km/h]'], c=df['predit_gear_position'], cmap='viridis', s=20, norm=norm)
-    ax.set_xlabel('時間[s]')
-    ax.set_ylabel('車速[km/h]')
-    plt.title("依車速、引擎轉速判斷變速箱操作檔位(忽略空檔、換檔間的操作情況)")
-    plt.colorbar(sc, label='檔位')
-    
-    st.pyplot(fig)
-
-
-    df['mu_r[kg/kg]'] = 0.00513 + 17.6 / (df['VehicleWeight[ton]'] * 1000.)
-    df['mu_aA[kg/(km/h)2]'] = 0.00299 * B * H - 0.000832
-    df['W_eq[kg]'] = (0.07 + 0.03*df['i_m']*df['i_m']) * (W0 * 1000.)
-    df['F_rr[N]'] = df['mu_r[kg/kg]'] * (df['VehicleWeight[ton]'] * 1000.) * 9.81 # 調整單位為N
-    df['F_slope[N]'] = (df['VehicleWeight[ton]'] * 1000.) * np.sin(np.arctan(df['grad[%]'] / 100)) * 9.81
-    df['F_air[N]'] = df['mu_aA[kg/(km/h)2]'] * df['VehicleSpeed[km/h]'] * df['VehicleSpeed[km/h]'] * 9.81
-    df['F_acc[N]'] = ((df['VehicleWeight[ton]'] * 1000.) + df['W_eq[kg]']) * df['acc[m/s^2]']
-    
-    df['R[N]'] = df['F_rr[N]'] + df['F_slope[N]'] + df['F_air[N]'] +df['F_acc[N]']
-
-    
-    def engine_torque(R, i_m): # 此R的單位為[N]
-        if R>=0: # 原稿為R>0
-            return r / eff_m / eff_f / i_m / i_f * R
-        else:
-            return r * eff_m * eff_f / i_m / i_f * R
-    
-    df['engine_torque[Nm]'] = df.apply(lambda x: engine_torque(x['R[N]'], x['i_m']), axis=1)
-    df['engine_power[kW]'] = df['engine_torque[Nm]'] * (df['EngineSpeed[rpm]'] * 2. * np.pi / 60.) / 1000.
+        # 14.975+(26-14.975)*0.9
+        with open('.//models//model_6_spacing_12x12_FULL_LOAD.pkl', 'rb') as f:
+            reg_FULL_LOAD = pickle.load(f)
+        # 14.975+(26-14.975)*0.55
+        with open('.//models//model_6_spacing_12x12_HALF_LOAD.pkl', 'rb') as f:
+            reg_HALF_LOAD = pickle.load(f)
+        
+        df['acc[m/s^2]'] = (df.loc[0, 'VehicleSpeed[km/h]'] - 0.) / 3.6 # 資料為逐秒紀錄
+        for i in range(1, len(df)):
+            df.loc[i, 'acc[m/s^2]'] = (df.loc[i, 'VehicleSpeed[km/h]'] - df.loc[i-1, 'VehicleSpeed[km/h]']) / 3.6
+        
+        # 檔位判斷，忽略空檔、換檔間的操作情況
+        def v_to_n(v, g):
+            """ 從車速[km/h]、檔位g，計算引擎轉速[rpm] """
+            if gear_ratio := i_m_1_n.get(g):
+                return (v*1000./60.) / (wheel_D*np.pi) * i_f * gear_ratio
+            else:
+                print("Gear Position Error!")
+        
+        def predit_gear_position(v, n):
+            """ 從車速[km/h]，計算1~16檔的可能引擎轉速，並取出最接近引擎轉速的檔位 """
+            l=[]
+            for g in range(1, i_m_m+1):
+                l.append(abs(v_to_n(v,g)-n))
+            return l.index(min(l))+1
+        
+        df['predit_gear_position'] = df.apply(lambda x: predit_gear_position(x['VehicleSpeed[km/h]'], x['EngineSpeed[rpm]']), axis=1)
+        df['i_m'] = df['predit_gear_position'].apply(lambda x :i_m_1_n.get(x))
+        
+        
+        fig, ax = plt.subplots(figsize=(16, 8))
+        norm = matplotlib.colors.Normalize(vmin=1, vmax=i_m_m)
+        sc = ax.scatter(df['time[s]'], df['VehicleSpeed[km/h]'], c=df['predit_gear_position'], cmap='viridis', s=20, norm=norm)
+        ax.set_xlabel('時間[s]')
+        ax.set_ylabel('車速[km/h]')
+        plt.title("依車速、引擎轉速判斷變速箱操作檔位(忽略空檔、換檔間的操作情況)")
+        plt.colorbar(sc, label='檔位')
+        
+        st.pyplot(fig)
 
 
-    VW_FULL_LOAD = 14.975+(26-14.975)*0.9 # [ton]
-    df['predict_FULL_LOAD_BSFC[g/kWh]'] = reg_FULL_LOAD.predict(df[['EngineSpeed[rpm]', 'engine_torque[Nm]']])
-    df['predict_FULL_LOAD_FuelRate[L/h]'] = df['predict_FULL_LOAD_BSFC[g/kWh]'] * df['engine_power[kW]'] / 1000. / density_deisel * 1000.
-    df.loc[df['predict_FULL_LOAD_FuelRate[L/h]']<0, 'predict_FULL_LOAD_FuelRate[L/h]'] = 0.
+        df['mu_r[kg/kg]'] = 0.00513 + 17.6 / (df['VehicleWeight[ton]'] * 1000.)
+        df['mu_aA[kg/(km/h)2]'] = 0.00299 * B * H - 0.000832
+        df['W_eq[kg]'] = (0.07 + 0.03*df['i_m']*df['i_m']) * (W0 * 1000.)
+        df['F_rr[N]'] = df['mu_r[kg/kg]'] * (df['VehicleWeight[ton]'] * 1000.) * 9.81 # 調整單位為N
+        df['F_slope[N]'] = (df['VehicleWeight[ton]'] * 1000.) * np.sin(np.arctan(df['grad[%]'] / 100)) * 9.81
+        df['F_air[N]'] = df['mu_aA[kg/(km/h)2]'] * df['VehicleSpeed[km/h]'] * df['VehicleSpeed[km/h]'] * 9.81
+        df['F_acc[N]'] = ((df['VehicleWeight[ton]'] * 1000.) + df['W_eq[kg]']) * df['acc[m/s^2]']
+        
+        df['R[N]'] = df['F_rr[N]'] + df['F_slope[N]'] + df['F_air[N]'] +df['F_acc[N]']
+
+        
+        def engine_torque(R, i_m): # 此R的單位為[N]
+            if R>=0:
+                return r / eff_m / eff_f / i_m / i_f * R
+            else:
+                return r * eff_m * eff_f / i_m / i_f * R
+        
+        df['engine_torque[Nm]'] = df.apply(lambda x: engine_torque(x['R[N]'], x['i_m']), axis=1)
+        df['engine_power[kW]'] = df['engine_torque[Nm]'] * (df['EngineSpeed[rpm]'] * 2. * np.pi / 60.) / 1000.
+
+
+        VW_FULL_LOAD = 14.975+(26-14.975)*0.9 # [ton]
+        df['predict_FULL_LOAD_BSFC[g/kWh]'] = reg_FULL_LOAD.predict(df[['EngineSpeed[rpm]', 'engine_torque[Nm]']])
+        df['predict_FULL_LOAD_FuelRate[L/h]'] = df['predict_FULL_LOAD_BSFC[g/kWh]'] * df['engine_power[kW]'] / 1000. / density_deisel * 1000.
+        df.loc[df['predict_FULL_LOAD_FuelRate[L/h]']<0, 'predict_FULL_LOAD_FuelRate[L/h]'] = 0.
+        
+        VW_HALF_LOAD = 14.975+(26-14.975)*0.55 # [ton]
+        df['predict_HALF_LOAD_BSFC[g/kWh]'] = reg_HALF_LOAD.predict(df[['EngineSpeed[rpm]', 'engine_torque[Nm]']])
+        df['predict_HALF_LOAD_FuelRate[L/h]'] = df['predict_HALF_LOAD_BSFC[g/kWh]'] * df['engine_power[kW]'] / 1000. / density_deisel * 1000.
+        df.loc[df['predict_HALF_LOAD_FuelRate[L/h]']<0, 'predict_HALF_LOAD_FuelRate[L/h]'] = 0.
+
+        df['predict_FuelRate[L/h]'] = df.apply(lambda x: x['predict_HALF_LOAD_FuelRate[L/h]'] +
+                                               (x['predict_FULL_LOAD_FuelRate[L/h]']-x['predict_HALF_LOAD_FuelRate[L/h]']) /
+                                               (VW_FULL_LOAD-VW_HALF_LOAD) *
+                                               (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)
+
+        st.subheader(f"累計行駛 {df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f} 公里")
+        st.subheader(f"預測用油 {df['predict_FuelRate[L/h]'].sum()/3600:.2f} 公升")
+        st.subheader(f"預測能效 {(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f} 公里/公升")
+
+
+def model_8():
+    st.write("可自行上傳具逐秒海拔高度、車速、引擎轉速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
+    st.write("檔案首列(row)為GPS_Altitude[m]、VehicleSpeed[km/h]、EngineSpeed[rpm]及VehicleWeight[ton]四欄位名稱, 其餘列的內容為數字資料。")
+    st.write("")
+    uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
+    st.write("")
     
-    VW_HALF_LOAD = 14.975+(26-14.975)*0.55 # [ton]
-    df['predict_HALF_LOAD_BSFC[g/kWh]'] = reg_HALF_LOAD.predict(df[['EngineSpeed[rpm]', 'engine_torque[Nm]']])
-    df['predict_HALF_LOAD_FuelRate[L/h]'] = df['predict_HALF_LOAD_BSFC[g/kWh]'] * df['engine_power[kW]'] / 1000. / density_deisel * 1000.
-    df.loc[df['predict_HALF_LOAD_FuelRate[L/h]']<0, 'predict_HALF_LOAD_FuelRate[L/h]'] = 0.
+    cols=['GPS_Altitude[m]', 'VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
+    if uploaded_file:
+        df=pd.read_csv(uploaded_file)
+        st.write("已上傳檔案：", uploaded_file.name)
+        st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
+        data_correctness=test_columns_correctness(cols, df)          
+    else:
+        df=pd.read_csv('.//data//default_data.csv')
+        st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")
+        data_correctness=True
+    
+    if data_correctness:
+        df=df[cols]
+        st.dataframe(df)
 
-    df['predict_FuelRate[L/h]'] = df.apply(lambda x: x['predict_HALF_LOAD_FuelRate[L/h]'] +
-                                           (x['predict_FULL_LOAD_FuelRate[L/h]']-x['predict_HALF_LOAD_FuelRate[L/h]']) /
-                                           (VW_FULL_LOAD-VW_HALF_LOAD) *
-                                           (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)
+        VW_FULL_LOAD = 14.975+(26-14.975)*0.9 # [ton]
+        VW_HALF_LOAD = 14.975+(26-14.975)*0.55 # [ton]
+        
+        df['acceleration[m/s^2]'] = 0.
+        for i in range(1,len(df)):
+            df.loc[i, 'acceleration[m/s^2]'] = (df.loc[i,'VehicleSpeed[km/h]'] - df.loc[i-1,'VehicleSpeed[km/h]']) / 3.6 # 逐秒資料
 
-    st.subheader(f"累計行駛 {df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f} 公里")
-    st.subheader(f"預測用油 {df['predict_FuelRate[L/h]'].sum()/3600:.2f} 公升")
-    st.subheader(f"預測能效 {(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f} 公里/公升")
+        df['delta_EngineSpeed[rpm]'] = 0.
+        for i in range(1,len(df)):
+            df.loc[i, 'delta_EngineSpeed[rpm]'] = df.loc[i,'EngineSpeed[rpm]'] - df.loc[i-1,'EngineSpeed[rpm]']
 
+        df['delta_Altitude[m]'] = 0.
+        for i in range(1,len(df)):
+            df.loc[i, 'delta_Altitude[m]'] = df.loc[i,'GPS_Altitude[m]'] - df.loc[i-1,'GPS_Altitude[m]']
 
-    # st.dataframe(df[['time[s]', 'VehicleWeight[ton]', 'VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'grad[%]',
-    #                  'F_rr[N]', 'F_slope[N]', 'F_air[N]', 'F_acc[N]',
-    #                  'engine_torque[Nm]', 'engine_power[kW]']]) 
+        with open('.//models//model_8_hidden_6_2_FULL_LOAD.pkl', 'rb') as f:
+            dnn_FULL_LOAD = pickle.load(f)
+        with open('.//models//model_8_scaler_FULL_LOAD.pkl', 'rb') as f:
+            scaler_FULL_LOAD = pickle.load(f)        
+        with open('.//models//model_8_hidden_6_2_HALF_LOAD.pkl', 'rb') as f:
+            dnn_HALF_LOAD = pickle.load(f)
+        with open('.//models//model_8_scaler_HALF_LOAD.pkl', 'rb') as f:
+            scaler_HALF_LOAD = pickle.load(f)
 
+        X = df[['GPS_Altitude[m]', 'delta_Altitude[m]', 'VehicleSpeed[km/h]', 'acceleration[m/s^2]', 'EngineSpeed[rpm]', 'delta_EngineSpeed[rpm]']]    
+        X_scaled_FULL_LOAD = scaler_FULL_LOAD.transform(X)
+        X_scaled_HALF_LOAD = scaler_HALF_LOAD.transform(X)
+        df['predict_FULL_LOAD_FuelRate[L/h]'] = dnn_FULL_LOAD.predict(X_scaled_FULL_LOAD)
+        df.loc[df['predict_FULL_LOAD_FuelRate[L/h]']<0, 'predict_FULL_LOAD_FuelRate[L/h]'] = 0.
+        df['predict_HALF_LOAD_FuelRate[L/h]'] = dnn_HALF_LOAD.predict(X_scaled_HALF_LOAD)
+        df.loc[df['predict_HALF_LOAD_FuelRate[L/h]']<0, 'predict_HALF_LOAD_FuelRate[L/h]'] = 0.        
 
+        df['predict_FuelRate[L/h]'] = df.apply(lambda x: x['predict_HALF_LOAD_FuelRate[L/h]'] +
+                                               (x['predict_FULL_LOAD_FuelRate[L/h]']-x['predict_HALF_LOAD_FuelRate[L/h]']) /
+                                               (VW_FULL_LOAD-VW_HALF_LOAD) *
+                                               (x['VehicleWeight[ton]']-VW_HALF_LOAD), axis=1)
+
+        st.subheader(f"累計行駛 {df['VehicleSpeed[km/h]'].sum()/3.6/1000:.2f} 公里")
+        st.subheader(f"預測用油 {df['predict_FuelRate[L/h]'].sum()/3600:.2f} 公升")
+        st.subheader(f"預測能效 {(df['VehicleSpeed[km/h]'].sum()/3.6/1000)/(df['predict_FuelRate[L/h]'].sum()/3600):.2f} 公里/公升")        
+        
     
     
-    
-    
 
-#網頁的sidebar版面
-st.sidebar.header("大貨車行駛及沿途上下貨之操作能效模擬 - v0.11")
-st.sidebar.markdown("**:green[以26噸大貨車道路實測數據推估]**")
+# 網頁的sidebar版面
+st.sidebar.header("大貨車行駛及沿途上下貨之操作能效模擬 - v0.12")
+st.sidebar.markdown("**:green[依26噸大貨車道路實測數據推估]**")
 option=st.sidebar.selectbox("功能模式：",
-                            options=['1. 耗油量=f(車速) 依迴歸分析',
-                                     '5. 耗油量=f(車速, 引擎轉速) 依迴歸分析',
-                                     '6. 制動馬力單位耗油量=f(引擎轉速, 引擎扭矩) 依車輛動力學(逆向動力傳遞)'])
+                            options=['1. 耗油量=f(車速)',
+                                     '5. 耗油量=f(車速, 引擎轉速)',
+                                     '6. 制動馬力耗油量=f(引擎轉速, 引擎扭矩) 採用車輛動力學、逆向動力傳遞方式計算',
+                                     '8. 採用深度神經網路(Deep Neural Network)方式計算'])
 st.sidebar.subheader("")
-st.sidebar.write(f"目前選用模式 {option} 推估")
-operation={'1. 耗油量=f(車速) 依迴歸分析': model_1,
-           '5. 耗油量=f(車速, 引擎轉速) 依迴歸分析': model_5,
-           '6. 制動馬力單位耗油量=f(引擎轉速, 引擎扭矩) 依車輛動力學(逆向動力傳遞)': model_6}
+st.sidebar.write(f"目前選用《{option}》模式，車重對耗油量影響以線性推估。")
+operation={'1. 耗油量=f(車速)': model_1,
+           '5. 耗油量=f(車速, 引擎轉速)': model_5,
+           '6. 制動馬力耗油量=f(引擎轉速, 引擎扭矩) 採用車輛動力學、逆向動力傳遞方式計算': model_6,
+           '8. 採用深度神經網路(Deep Neural Network)方式計算': model_8}
 
 
 
 
-#主程式
+# 主程式(網頁的主版面)
 if __name__ == "__main__":
     operation[option]()
 
