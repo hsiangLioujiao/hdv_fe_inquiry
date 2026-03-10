@@ -110,9 +110,9 @@ def model_5():
             reg_HALF_LOAD = pickle.load(f)
 
         df['predict_FULL_LOAD_FuelRate[L/h]'] = reg_FULL_LOAD.predict(df[['VehicleSpeed[km/h]', 'EngineSpeed[rpm]']])
-        df.loc[df['predict_FULL_LOAD_FuelRate[L/h]']<0, 'predict_FULL_LOAD_FuelRate[L/h]'] = 0.
+        # df.loc[df['predict_FULL_LOAD_FuelRate[L/h]']<0, 'predict_FULL_LOAD_FuelRate[L/h]'] = 0.
         df['predict_HALF_LOAD_FuelRate[L/h]'] = reg_HALF_LOAD.predict(df[['VehicleSpeed[km/h]', 'EngineSpeed[rpm]']])
-        df.loc[df['predict_HALF_LOAD_FuelRate[L/h]']<0, 'predict_HALF_LOAD_FuelRate[L/h]'] = 0.
+        # df.loc[df['predict_HALF_LOAD_FuelRate[L/h]']<0, 'predict_HALF_LOAD_FuelRate[L/h]'] = 0.
 
         df['predict_FuelRate[L/h]'] = df.apply(lambda x: x['predict_HALF_LOAD_FuelRate[L/h]'] +
                                                (x['predict_FULL_LOAD_FuelRate[L/h]']-x['predict_HALF_LOAD_FuelRate[L/h]']) /
@@ -345,6 +345,7 @@ operation={'1. 耗油量=f(車速)': model_1,
 # 主程式(網頁的主版面)
 if __name__ == "__main__":
     operation[option]()
+
 
 
 
