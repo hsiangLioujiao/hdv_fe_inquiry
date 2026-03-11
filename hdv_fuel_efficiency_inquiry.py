@@ -176,11 +176,11 @@ def model_6():
         df['time[s]'] = [i for i in range(1, len(df)+1)]
         df = df[['time[s]', 'VehicleWeight[ton]', 'VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'grad[%]']]    
 
-        # 14.975+(26-14.975)*0.9
-        with open('.//models//model_6_spacing_12x12_FULL_LOAD.pkl', 'rb') as f:
+        # FULL_LOAD 14.975+(26-14.975)*0.9
+        with open('.//models//model_6_spacing_8x8_FULL_LOAD.pkl', 'rb') as f:
             reg_FULL_LOAD = pickle.load(f)
-        # 14.975+(26-14.975)*0.55
-        with open('.//models//model_6_spacing_12x12_HALF_LOAD.pkl', 'rb') as f:
+        # HALF_LOAD 14.975+(26-14.975)*0.55
+        with open('.//models//model_6_spacing_8x8_HALF_LOAD.pkl', 'rb') as f:
             reg_HALF_LOAD = pickle.load(f)
         
         df['acc[m/s^2]'] = (df.loc[0, 'VehicleSpeed[km/h]'] - 0.) / 3.6 # 資料為逐秒紀錄
@@ -345,7 +345,6 @@ operation={'1. 耗油量=f(車速)': model_1,
 # 主程式(網頁的主版面)
 if __name__ == "__main__":
     operation[option]()
-
 
 
 
