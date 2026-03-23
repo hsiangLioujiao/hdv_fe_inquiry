@@ -128,7 +128,7 @@ def model_6():
     st.markdown("**:green[此推估使用日本重車能效法規的車輛空氣阻力係數、輪胎滾動阻力係數、傳動效率...等經驗式及經驗數值。下列規格數據為實測26噸大貨車資料，可視實際情況調整。]**")
     st.write("")
     
-    density_deisel = 836. # 柴油密度[kg/m3] @ VECTO
+    DENSITY_DEISEL = 836. # 柴油密度[kg/m3] @ VECTO
     
     col1, col2 = st.columns(2)
     gvw = col1.number_input("輸入車輛核定總重[噸]", value=26.0, placeholder="Type a number...")
@@ -174,15 +174,15 @@ def model_6():
         st.dataframe(df)
         
         df['time[s]'] = [i for i in range(1, len(df)+1)]
-        df['grad[%]'] = 0
+        df['grad[%]'] = 0 # 忽略道路坡度影響
         df = df[['time[s]', 'VehicleWeight[ton]', 'VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'grad[%]']]    
 
-        # FULL_LOAD 14.975+(26-14.975)*0.9
-        with open('.//models//model_6_spacing_8x8_FULL_LOAD.pkl', 'rb') as f:
-            reg_FULL_LOAD = pickle.load(f)
-        # HALF_LOAD 14.975+(26-14.975)*0.55
-        with open('.//models//model_6_spacing_8x8_HALF_LOAD.pkl', 'rb') as f:
-            reg_HALF_LOAD = pickle.load(f)
+        # # FULL_LOAD 14.975+(26-14.975)*0.9
+        # with open('.//models//model_6_spacing_8x8_FULL_LOAD.pkl', 'rb') as f:
+            # reg_FULL_LOAD = pickle.load(f)
+        # # HALF_LOAD 14.975+(26-14.975)*0.55
+        # with open('.//models//model_6_spacing_8x8_HALF_LOAD.pkl', 'rb') as f:
+            # reg_HALF_LOAD = pickle.load(f)
         
         df['acc[m/s^2]'] = (df.loc[0, 'VehicleSpeed[km/h]'] - 0.) / 3.6 # 資料為逐秒紀錄
         for i in range(1, len(df)):
@@ -236,17 +236,43 @@ def model_6():
                 return r * eff_m * eff_f / i_m / i_f * R
         
         df['engine_torque[Nm]'] = df.apply(lambda x: engine_torque(x['R[N]'], x['i_m']), axis=1)
-        df['engine_power[kW]'] = df['engine_torque[Nm]'] * (df['EngineSpeed[rpm]'] * 2. * np.pi / 60.) / 1000.
+        # df['engine_power[kW]'] = df['engine_torque[Nm]'] * (df['EngineSpeed[rpm]'] * 2. * np.pi / 60.) / 1000.
 
 
         VW_FULL_LOAD = 14.975+(26-14.975)*0.9 # [ton]
-        df['predict_FULL_LOAD_BSFC[g/kWh]'] = reg_FULL_LOAD.predict(df[['EngineSpeed[rpm]', 'engine_torque[Nm]']])
-        df['predict_FULL_LOAD_FuelRate[L/h]'] = df['predict_FULL_LOAD_BSFC[g/kWh]'] * df['engine_power[kW]'] / 1000. / density_deisel * 1000.
+        dfGG = pd.read_csv(f".\\models\\model_6_spacing_8x8_FULL_LOAD(填補).csv")
+        dfGG['engine_power[kW]'] =  dfGG['EngineSpeed[rpm]']/60*2*np.pi * dfGG['engine_torque[Nm]']/1000
+        dfGG['flow_rate[L/h]'] = dfGG['median'] * dfGG['engine_power[kW]'] / 1000 / DENSITY_DEISEL * 1000
+        min_GGspeed = dfGG['EngineSpeed_left[rpm]'].min()
+        max_GGspeed = dfGG['EngineSpeed_right[rpm]'].max()
+        min_GGtorque = dfGG['engine_torque_left[Nm]'].min()
+        max_GGtorque = dfGG['engine_torque_right[Nm]'].max()
+        
+        def lookup_df2(row):
+            mask = (
+                ((dfGG['engine_torque_left[Nm]'] < row['engine_torque[Nm]']) | (row['engine_torque[Nm]'] <= min_GGtorque))
+                & ((row['engine_torque[Nm]'] <= dfGG['engine_torque_right[Nm]']) | (row['engine_torque[Nm]'] > max_GGtorque))
+                & ((dfGG['EngineSpeed_left[rpm]'] < row['EngineSpeed[rpm]']) | (row['EngineSpeed[rpm]'] <= min_GGspeed))
+                & ((row['EngineSpeed[rpm]'] <= dfGG['EngineSpeed_right[rpm]']) | (row['EngineSpeed[rpm]'] > max_GGspeed))
+            )
+            match = dfGG[mask]
+            if not match.empty:
+                return match['flow_rate[L/h]'].values[0]
+
+        df['predict_FULL_LOAD_FuelRate[L/h]'] = df.apply(lookup_df2, axis=1)
         df.loc[df['predict_FULL_LOAD_FuelRate[L/h]']<0, 'predict_FULL_LOAD_FuelRate[L/h]'] = 0.
+
         
         VW_HALF_LOAD = 14.975+(26-14.975)*0.55 # [ton]
-        df['predict_HALF_LOAD_BSFC[g/kWh]'] = reg_HALF_LOAD.predict(df[['EngineSpeed[rpm]', 'engine_torque[Nm]']])
-        df['predict_HALF_LOAD_FuelRate[L/h]'] = df['predict_HALF_LOAD_BSFC[g/kWh]'] * df['engine_power[kW]'] / 1000. / density_deisel * 1000.
+        dfGG = pd.read_csv(f".\\models\\model_6_spacing_8x8_HALF_LOAD(填補).csv")
+        dfGG['engine_power[kW]'] =  dfGG['EngineSpeed[rpm]']/60*2*np.pi * dfGG['engine_torque[Nm]']/1000
+        dfGG['flow_rate[L/h]'] = dfGG['median'] * dfGG['engine_power[kW]'] / 1000 / DENSITY_DEISEL * 1000
+        min_GGspeed = dfGG['EngineSpeed_left[rpm]'].min()
+        max_GGspeed = dfGG['EngineSpeed_right[rpm]'].max()
+        min_GGtorque = dfGG['engine_torque_left[Nm]'].min()
+        max_GGtorque = dfGG['engine_torque_right[Nm]'].max()
+        
+        df['predict_HALF_LOAD_FuelRate[L/h]'] = df.apply(lookup_df2, axis=1)
         df.loc[df['predict_HALF_LOAD_FuelRate[L/h]']<0, 'predict_HALF_LOAD_FuelRate[L/h]'] = 0.
 
         df['predict_FuelRate[L/h]'] = df.apply(lambda x: x['predict_HALF_LOAD_FuelRate[L/h]'] +
