@@ -240,7 +240,7 @@ def model_6():
 
 
         VW_FULL_LOAD = 14.975+(26-14.975)*0.9 # [ton]
-        dfGG = pd.read_csv(f".\\models\\model_6_spacing_8x8_FULL_LOAD(填補).csv")
+        dfGG = pd.read_csv(f".//models//model_6_spacing_8x8_FULL_LOAD(填補).csv")
         dfGG['engine_power[kW]'] =  dfGG['EngineSpeed[rpm]']/60*2*np.pi * dfGG['engine_torque[Nm]']/1000
         dfGG['flow_rate[L/h]'] = dfGG['median'] * dfGG['engine_power[kW]'] / 1000 / DENSITY_DEISEL * 1000
         min_GGspeed = dfGG['EngineSpeed_left[rpm]'].min()
@@ -264,7 +264,7 @@ def model_6():
 
         
         VW_HALF_LOAD = 14.975+(26-14.975)*0.55 # [ton]
-        dfGG = pd.read_csv(f".\\models\\model_6_spacing_8x8_HALF_LOAD(填補).csv")
+        dfGG = pd.read_csv(f".//models//model_6_spacing_8x8_HALF_LOAD(填補).csv")
         dfGG['engine_power[kW]'] =  dfGG['EngineSpeed[rpm]']/60*2*np.pi * dfGG['engine_torque[Nm]']/1000
         dfGG['flow_rate[L/h]'] = dfGG['median'] * dfGG['engine_power[kW]'] / 1000 / DENSITY_DEISEL * 1000
         min_GGspeed = dfGG['EngineSpeed_left[rpm]'].min()
