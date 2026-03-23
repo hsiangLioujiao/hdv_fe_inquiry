@@ -135,7 +135,7 @@ def model_6():
     W0 = col2.number_input("輸入車輛空車重[噸]", value=14.975, placeholder="Type a number...")
     B = col1.number_input("輸入車寬[公尺]", value=2.6, placeholder="Type a number...")
     H = col2.number_input("輸入車高[公尺]", value=3.75, placeholder="Type a number...")
-    CC = st.number_input("輸入引擎總排氣量[cc]", value=12913, placeholder="Type a number...")
+    # CC = st.number_input("輸入引擎總排氣量[cc]", value=12913, placeholder="Type a number...")
     
     col3, col4 = st.columns(2)
     i_m_n_r = col3.text_input("輸入變速箱檔位及齒比，格式如{1:14.68, ...}", "{1:14.68, 2:12.05, 3:9.92, 4:8.14, 5:6.78, 6:5.56, 7:4.57, 8:3.75, 9:3.22, 10:2.64, 11:2.17, 12:1.78, 13:1.49, 14:1.22, 15:1, 16:0.82}")
@@ -152,13 +152,13 @@ def model_6():
     r = wheel_D / 2.
 
     st.subheader("")    
-    st.write("可自行上傳具逐秒車速、引擎轉速、道路坡度、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
-    st.write("檔案首列(row)為VehicleSpeed[km/h], EngineSpeed[rpm], grad[%], VehicleWeight[ton]四欄位名稱, 其餘列的內容為數字資料。")
+    st.write("可自行上傳具逐秒車速、引擎轉速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
+    st.write("檔案首列(row)為VehicleSpeed[km/h], EngineSpeed[rpm], VehicleWeight[ton]三欄位名稱, 其餘列的內容為數字資料。")
     st.write("")
     uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
     st.write("")
     
-    cols=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'grad[%]', 'VehicleWeight[ton]']
+    cols=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
     if uploaded_file:
         df=pd.read_csv(uploaded_file)
         st.write("已上傳檔案：", uploaded_file.name)
@@ -174,6 +174,7 @@ def model_6():
         st.dataframe(df)
         
         df['time[s]'] = [i for i in range(1, len(df)+1)]
+        df['grad[%]'] = 0
         df = df[['time[s]', 'VehicleWeight[ton]', 'VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'grad[%]']]    
 
         # FULL_LOAD 14.975+(26-14.975)*0.9
