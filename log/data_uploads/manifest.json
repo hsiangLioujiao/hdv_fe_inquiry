@@ -16,5 +16,14 @@
         "note": "k5",
         "upload_time": "2026-04-02 15:33:49",
         "file_size_kb": 235.48
+    },
+    {
+        "id": "20260407_101354_d3d21b",
+        "original_name": "testing_HALF_LOAD_1ST.csv",
+        "github_path": "./data/uploads/2026-04/20260407_101354_testing_HALF_LOAD_1ST.csv",
+        "uploader": "gss",
+        "note": "gss1",
+        "upload_time": "2026-04-07 10:13:54",
+        "file_size_kb": 2679.52
     }
 ]
