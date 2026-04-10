@@ -1,3 +1,4 @@
+import time
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -7,6 +8,11 @@ import seaborn as sns
 import streamlit as st
 import ast
 import pickle
+from github import Github
+from github import Auth
+import datetime
+import json
+import uuid
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 
@@ -17,31 +23,39 @@ pd.options.mode.copy_on_write = True
 fm.fontManager.addfont('TaipeiSansTCBeta-Regular.ttf')
 plt.rcParams["font.size"] = 14
 plt.rcParams['font.family'] = 'Taipei Sans TC Beta'
-st.set_page_config(page_title="功能打樣版 僅供3人同時使用", page_icon="random")
+st.set_page_config(page_title = "功能打樣版 僅供3人同時使用", page_icon = "random")
+
+
+if 'show_login_form' not in st.session_state:
+    st.session_state.show_login_form = False
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
 
 
 
 
 def model_1():
-    st.write("可自行上傳具逐秒車速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
+    st.write("可自行上傳逐秒車速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
     st.write("檔案首列(row)為VehicleSpeed[km/h]及VehicleWeight[ton]兩欄位名稱, 其餘列的內容為數字資料。")  
     st.write("")
-    uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
+    uploaded_file = st.file_uploader("選擇上傳檔案：", type=".csv")
     st.write("")
     
+    data_correctness = False
     cols=['VehicleSpeed[km/h]', 'VehicleWeight[ton]']
     if uploaded_file:
-        df=pd.read_csv(uploaded_file)
+        df = pd.read_csv(uploaded_file)
         st.write("已上傳檔案：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
-        data_correctness=test_columns_correctness(cols, df)
+        data_correctness = test_columns_correctness(cols, df)
+        st.session_state['uploaded_file'] = uploaded_file        
     else:
-        df=pd.read_csv('.//data//default_data.csv')
+        df = pd.read_csv('.//data//default_data.csv')
         st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")   
-        data_correctness=True
+        data_correctness = True
     
     if data_correctness:
-        df=df[cols]
+        df = df[cols]
         st.dataframe(df)
         
         df['time[s]'] = [i for i in range(1, len(df)+1)]
@@ -80,25 +94,27 @@ def model_1():
 
 
 def model_5():
-    st.write("可自行上傳具逐秒車速、引擎轉速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
+    st.write("可自行上傳逐秒車速、引擎轉速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
     st.write("檔案首列(row)為VehicleSpeed[km/h]、EngineSpeed[rpm]及VehicleWeight[ton]三欄位名稱, 其餘列的內容為數字資料。")
     st.write("")
-    uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
+    uploaded_file = st.file_uploader("選擇上傳檔案：", type=".csv")
     st.write("")
     
-    cols=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
+    data_correctness = False
+    cols = ['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
     if uploaded_file:
-        df=pd.read_csv(uploaded_file)
+        df = pd.read_csv(uploaded_file)
         st.write("已上傳檔案：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
-        data_correctness=test_columns_correctness(cols, df)          
+        data_correctness = test_columns_correctness(cols, df)
+        st.session_state['uploaded_file'] = uploaded_file
     else:
-        df=pd.read_csv('.//data//default_data.csv')
+        df = pd.read_csv('.//data//default_data.csv')
         st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")
-        data_correctness=True
+        data_correctness = True
     
     if data_correctness:
-        df=df[cols]
+        df = df[cols]
         st.dataframe(df)        
 
         VW_FULL_LOAD = 14.975+(26-14.975)*0.9 # [ton]
@@ -152,25 +168,27 @@ def model_6():
     r = wheel_D / 2.
 
     st.subheader("")    
-    st.write("可自行上傳具逐秒車速、引擎轉速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
+    st.write("可自行上傳逐秒車速、引擎轉速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
     st.write("檔案首列(row)為VehicleSpeed[km/h], EngineSpeed[rpm], VehicleWeight[ton]三欄位名稱, 其餘列的內容為數字資料。")
     st.write("")
-    uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
+    uploaded_file = st.file_uploader("選擇上傳檔案：", type=".csv")
     st.write("")
     
-    cols=['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
+    data_correctness = False
+    cols = ['VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
     if uploaded_file:
-        df=pd.read_csv(uploaded_file)
+        df = pd.read_csv(uploaded_file)
         st.write("已上傳檔案：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
-        data_correctness=test_columns_correctness(cols, df)
+        data_correctness = test_columns_correctness(cols, df)
+        st.session_state['uploaded_file'] = uploaded_file
     else:
-        df=pd.read_csv('.//data//default_data.csv')
+        df = pd.read_csv('.//data//default_data.csv')
         st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")
-        data_correctness=True        
+        data_correctness = True        
 
     if data_correctness:
-        df=df[cols]
+        df = df[cols]
         st.dataframe(df)
         
         df['time[s]'] = [i for i in range(1, len(df)+1)]
@@ -240,7 +258,7 @@ def model_6():
 
 
         VW_FULL_LOAD = 14.975+(26-14.975)*0.9 # [ton]
-        dfGG = pd.read_csv(f".//models//model_6_spacing_8x8_FULL_LOAD(填補).csv")
+        dfGG = pd.read_csv(f".\\models\\model_6_spacing_8x8_FULL_LOAD(填補).csv")
         dfGG['engine_power[kW]'] =  dfGG['EngineSpeed[rpm]']/60*2*np.pi * dfGG['engine_torque[Nm]']/1000
         dfGG['flow_rate[L/h]'] = dfGG['median'] * dfGG['engine_power[kW]'] / 1000 / DENSITY_DEISEL * 1000
         min_GGspeed = dfGG['EngineSpeed_left[rpm]'].min()
@@ -264,7 +282,7 @@ def model_6():
 
         
         VW_HALF_LOAD = 14.975+(26-14.975)*0.55 # [ton]
-        dfGG = pd.read_csv(f".//models//model_6_spacing_8x8_HALF_LOAD(填補).csv")
+        dfGG = pd.read_csv(f".\\models\\model_6_spacing_8x8_HALF_LOAD(填補).csv")
         dfGG['engine_power[kW]'] =  dfGG['EngineSpeed[rpm]']/60*2*np.pi * dfGG['engine_torque[Nm]']/1000
         dfGG['flow_rate[L/h]'] = dfGG['median'] * dfGG['engine_power[kW]'] / 1000 / DENSITY_DEISEL * 1000
         min_GGspeed = dfGG['EngineSpeed_left[rpm]'].min()
@@ -286,18 +304,20 @@ def model_6():
 
 
 def model_8():
-    st.write("可自行上傳具逐秒海拔高度、車速、引擎轉速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
+    st.write("可自行上傳逐秒海拔高度、車速、引擎轉速、車重資料的檔案(.csv)，需以「,」區隔欄位(columns)。(註: 車重=空車重+載重)")
     st.write("檔案首列(row)為GPS_Altitude[m]、VehicleSpeed[km/h]、EngineSpeed[rpm]及VehicleWeight[ton]四欄位名稱, 其餘列的內容為數字資料。")
     st.write("")
-    uploaded_file=st.file_uploader("選擇上傳檔案：",type=".csv")    
+    uploaded_file=st.file_uploader("選擇上傳檔案：", type=".csv") 
     st.write("")
     
+    data_correctness = False
     cols=['GPS_Altitude[m]', 'VehicleSpeed[km/h]', 'EngineSpeed[rpm]', 'VehicleWeight[ton]']
     if uploaded_file:
         df=pd.read_csv(uploaded_file)
         st.write("已上傳檔案：", uploaded_file.name)
         st.write(f"上傳的行駛操作資料(共{len(df)}筆紀錄)：")
-        data_correctness=test_columns_correctness(cols, df)          
+        data_correctness=test_columns_correctness(cols, df)
+        st.session_state['uploaded_file'] = uploaded_file
     else:
         df=pd.read_csv('.//data//default_data.csv')
         st.write(f"預設的行駛操作資料(共{len(df)}筆紀錄)：")
@@ -351,27 +371,105 @@ def model_8():
     
     
 
-# 網頁的sidebar版面
-st.sidebar.header("大貨車行駛及沿途上下貨之操作能效模擬 - v0.12")
-st.sidebar.markdown("**:green[依26噸大貨車道路實測數據推估]**")
-option=st.sidebar.selectbox("功能模式：",
-                            options=['1. 耗油量=f(車速)',
-                                     '5. 耗油量=f(車速, 引擎轉速)',
-                                     '6. 制動馬力耗油量=f(引擎轉速, 引擎扭矩) 採用車輛動力學、逆向動力傳遞方式計算',
-                                     '8. 採用深度神經網路(Deep Neural Network)方式計算'])
-st.sidebar.subheader("")
-st.sidebar.write(f"目前選用《{option}》模式，車重對耗油量影響以線性推估。")
-operation={'1. 耗油量=f(車速)': model_1,
-           '5. 耗油量=f(車速, 引擎轉速)': model_5,
-           '6. 制動馬力耗油量=f(引擎轉速, 引擎扭矩) 採用車輛動力學、逆向動力傳遞方式計算': model_6,
-           '8. 採用深度神經網路(Deep Neural Network)方式計算': model_8}
-
-
-
-
-# 主程式(網頁的主版面)
 if __name__ == "__main__":
+    st.sidebar.header("大貨車行駛及沿途上下貨操作之耗油量與能效模擬 - V0.13")
+    st.sidebar.markdown("**:green[依26噸大貨車道路實測數據推估]**")
+    option=st.sidebar.selectbox("功能模式：",
+                                options=['1. 耗油量=f(車速)',
+                                         '5. 耗油量=f(車速, 引擎轉速)',
+                                         '6. 制動馬力耗油量=f(引擎轉速, 引擎扭矩) 採用車輛動力學、逆向動力傳遞方式計算',
+                                         '8. 採用深度神經網路(Deep Neural Network)方式計算'])
+    st.sidebar.subheader("")
+    st.sidebar.write(f"目前選用《{option}》模式，車重對耗油量影響以線性推估。")
+
+
+    operation={'1. 耗油量=f(車速)': model_1,
+               '5. 耗油量=f(車速, 引擎轉速)': model_5,
+               '6. 制動馬力耗油量=f(引擎轉速, 引擎扭矩) 採用車輛動力學、逆向動力傳遞方式計算': model_6,
+               '8. 採用深度神經網路(Deep Neural Network)方式計算': model_8}
+               
     operation[option]()
 
 
+    if 'uploaded_file' in st.session_state:
+        if not st.session_state.show_login_form:
+            st.divider()
+            if st.button("🚀 協助建模"):
+                st.session_state.show_login_form = True
+                st.rerun()
+        else:
+            if not st.session_state.logged_in:
+                st.sidebar.divider()
+                st.sidebar.subheader("🔑 協助建模(得免申請、免填密碼登入)")
+                username = st.sidebar.text_input("帳號")
+                password = st.sidebar.text_input("密碼", type="password")
+ 
+                if st.sidebar.button("登入"):
+                    if username:
+                        st.session_state.logged_in = True
+                        st.session_state.user = username
+                        st.rerun()
+                    else:
+                        st.sidebar.warning("⚠️ 請填寫帳號後再按登入！")
+                        time.sleep(3)
+                        st.session_state.logged_in = False
+                        st.rerun()
+            else:
+                st.divider()
+                st.subheader(f"👨‍⚕️ 協助建模者：{st.session_state.user}")
+                file_note = st.text_area(label="📝 檔案備註", placeholder="請簡述此檔案(.csv)的行駛區域或路線，回饋此檔案實際的累計用油量或平均能效。亦接受上傳具GPS、用油或能效等資訊欄位，請簡述。", label_visibility="visible")
+                if st.button("確認提供資訊"):
+                    placeholder = st.empty()
+                    
+                    now_time = datetime.datetime.now()
+                    timestamp = now_time.strftime("%Y%m%d_%H%M%S")
+                    unique_id = str(uuid.uuid4())[:6]
+                    file_path = f"./data/uploads/{now_time.strftime('%Y-%m')}/{timestamp}_{st.session_state['uploaded_file'].name}"
+                    MANIFEST_PATH = "./log/data_uploads/manifest.json"
+                    
+                    new_entry = {
+                        "id": f"{timestamp}_{unique_id}",
+                        "original_name": st.session_state['uploaded_file'].name,
+                        "github_path": file_path,
+                        "uploader": st.session_state.user,
+                        "note": file_note,
+                        "upload_time": now_time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "file_size_kb": round(st.session_state['uploaded_file'].size / 1024, 2)
+                    }
+                    
+                    try:
+                        github_repo_name = "hdv_fe_inquiry"
+                        token = st.secrets["github"]["token"]
+                        auth = Auth.Token(token)
+                        g = Github(auth=auth)
+                        repo = g.get_user().get_repo(github_repo_name)
+                        repo.create_file(
+                            path=file_path, 
+                            message=f"Upload by {st.session_state.user}", 
+                            content=st.session_state['uploaded_file'].getvalue()
+                        )                        
+                        try:
+                            manifest_content = repo.get_contents(MANIFEST_PATH)
+                            files_data = json.loads(manifest_content.decoded_content.decode('utf-8'))
+                            manifest_sha = manifest_content.sha
+                        except:
+                            files_data = []
+                            manifest_sha = None                    
 
+                        files_data.append(new_entry)
+                        updated_json = json.dumps(files_data, indent=4, ensure_ascii=False)                    
+                        if manifest_sha:
+                            repo.update_file(MANIFEST_PATH, f"Update index by {st.session_state.user}", updated_json, manifest_sha)
+                        else:
+                            repo.create_file(MANIFEST_PATH, "Initial index", updated_json)
+                    
+                        placeholder.success(f"✅ 完成上傳!")
+                        st.session_state.logged_in = False
+                        st.session_state.show_login_form = False
+                        del st.session_state.uploaded_file
+                    except Exception as e:
+                        placeholder.error(f"❌ 儲存失敗：{e}")                        
+
+                    time.sleep(5)
+                    placeholder.empty()
+                    st.rerun()
