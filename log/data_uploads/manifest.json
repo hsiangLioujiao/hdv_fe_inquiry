@@ -124,5 +124,14 @@
         "note": "test 0410",
         "upload_time": "2026-04-10 03:17:31",
         "file_size_kb": 2679.52
+    },
+    {
+        "id": "20260420_002927_7e4a21",
+        "original_name": "test_gdf.csv",
+        "github_path": "./data/uploads/2026-04/20260420_002927_test_gdf.csv",
+        "uploader": "kk",
+        "note": "test 0420-1",
+        "upload_time": "2026-04-20 00:29:27",
+        "file_size_kb": 12.6
     }
 ]
