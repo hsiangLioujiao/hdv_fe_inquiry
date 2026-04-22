@@ -142,5 +142,14 @@
         "note": "test 0420-2",
         "upload_time": "2026-04-20 02:27:02",
         "file_size_kb": 12.6
+    },
+    {
+        "id": "20260422_030315_339d23",
+        "original_name": "Class2_RigidTruck_ENG_RRC4.vsum.csv",
+        "github_path": "./data/uploads/2026-04/20260422_030315_Class2_RigidTruck_ENG_RRC4.vsum.csv",
+        "uploader": "555",
+        "note": "555",
+        "upload_time": "2026-04-22 03:03:15",
+        "file_size_kb": 6.34
     }
 ]
